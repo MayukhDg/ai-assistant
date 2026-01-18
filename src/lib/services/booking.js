@@ -185,15 +185,18 @@ export async function bookAppointment(businessId, {
     }
   }
   
-  // Get business slot duration
+  // Get business slot duration and timezone
   const { data: business } = await supabase
     .from('businesses')
-    .select('slot_duration_minutes')
+    .select('slot_duration_minutes, timezone')
     .eq('id', businessId)
     .single()
   
-  // Create appointment
-  const scheduledAt = `${date}T${time}:00`
+  // Create appointment with proper timezone
+  // Convert local time to UTC for storage
+  const localDateTime = `${date}T${time}:00`
+  const timezone = business?.timezone || 'America/New_York'
+  const scheduledAt = fromZonedTime(new Date(localDateTime), timezone).toISOString()
   
   const { data: appointment, error } = await supabase
     .from('appointments')

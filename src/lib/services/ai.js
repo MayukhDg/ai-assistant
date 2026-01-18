@@ -120,6 +120,10 @@ const TOOLS = [
  * Build the system prompt for a business
  */
 export function buildSystemPrompt(business) {
+  const timezone = business.timezone || 'America/New_York'
+  const now = new Date()
+  const localTime = now.toLocaleString('en-US', { timeZone: timezone })
+  
   const basePrompt = `You are a professional AI receptionist for ${business.name || 'our business'}.
 
 Your responsibilities:
@@ -131,17 +135,21 @@ Your responsibilities:
 
 Business Information:
 - Type: ${business.business_type || 'General Business'}
-- Timezone: ${business.timezone || 'America/New_York'}
+- Timezone: ${timezone}
 - Slot Duration: ${business.slot_duration_minutes || 30} minutes
+
+Current Date/Time (in business timezone): ${localTime}
+Today's date: ${now.toLocaleDateString('en-CA', { timeZone: timezone })}
 
 Guidelines:
 - Be concise and natural - keep responses under 2 sentences when possible
 - Always confirm the date and time before booking
+- When user says "today", "tomorrow", or times like "3pm", interpret them in the business timezone (${timezone})
+- Always use 24-hour format (HH:MM) when calling book_appointment (e.g., 15:00 for 3pm)
 - If the caller hasn't provided their name, ask for it
 - If you cannot help with something, offer to transfer to a human
 - Never make up availability - always use the check_availability function
-- Always use book_appointment function to finalize bookings
-- Today's date is ${new Date().toISOString().split('T')[0]}`
+- Always use book_appointment function to finalize bookings`
 
   return business.system_prompt 
     ? `${basePrompt}\n\nAdditional Instructions:\n${business.system_prompt}`
