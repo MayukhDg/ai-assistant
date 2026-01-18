@@ -27,18 +27,24 @@ export async function POST(request) {
       CallSid,
       From,
       To,
-      CallStatus
+      CallStatus,
+      Direction
     } = body
     
     console.log(`📞 Incoming call: ${CallSid}`)
     console.log(`   From: ${From}`)
     console.log(`   To: ${To}`)
+    console.log(`   Direction: ${Direction}`)
+    
+    // For inbound calls: look up by To (Twilio number)
+    // For outbound calls: look up by From (Twilio number)
+    const twilioNumber = Direction === 'outbound-api' ? From : To
     
     // Look up business by phone number
     const { data: business, error } = await supabase
       .from('businesses')
       .select('*')
-      .eq('phone_number', To)
+      .eq('phone_number', twilioNumber)
       .single()
     
     if (error || !business) {
