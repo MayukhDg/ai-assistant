@@ -27,7 +27,7 @@ export async function POST(request) {
     
     const call = await client.calls.create({
       to: phoneNumber,
-      from: '+18126489236', // Your Twilio number
+      from: '+14156344586', // Your Twilio number (California)
       url: `${process.env.NEXT_PUBLIC_APP_URL}/api/voice/incoming`,
       statusCallback: `${process.env.NEXT_PUBLIC_APP_URL}/api/voice/status`,
       statusCallbackEvent: ['completed']
