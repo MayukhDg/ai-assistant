@@ -143,7 +143,14 @@ const TOOLS = [
 ]
 
 async function handleExotelStream(connection, req) {
-    const socket = connection.socket
+    // @fastify/websocket v10 passes a connection object with a socket property
+    // We use a fallback just in case the socket is passed directly
+    const socket = connection.socket || connection
+
+    if (!socket || typeof socket.on !== 'function') {
+        console.error('❌ CRITICAL: Could not find WebSocket in connection object (Exotel)')
+        return
+    }
 
     // State for this call
     let streamSid = null
