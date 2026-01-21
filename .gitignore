@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local test scripts
+make_test_call.js
+scripts/
+temp/
+*.local.js

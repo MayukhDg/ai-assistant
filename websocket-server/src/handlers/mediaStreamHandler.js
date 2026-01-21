@@ -69,7 +69,7 @@ const TOOLS = [
     }
   },
   {
-    type: 'function', 
+    type: 'function',
     name: 'book_appointment',
     description: 'Book an appointment for a caller',
     parameters: {
@@ -141,7 +141,7 @@ const TOOLS = [
 
 async function handleMediaStream(connection, req) {
   const socket = connection.socket
-  
+
   // State for this call
   let streamSid = null
   let callSid = null
@@ -150,29 +150,30 @@ async function handleMediaStream(connection, req) {
   let callId = null
   let openaiWs = null
   let transcript = []
-  
+
   // Parse custom parameters from URL (passed by Twilio TwiML)
   const url = new URL(req.url, `http://${req.headers.host}`)
   businessId = url.searchParams.get('businessId')
-  
+
   socket.on('message', async (message) => {
     try {
       const data = JSON.parse(message.toString())
-      
+
       switch (data.event) {
         case 'connected':
-          console.log('📱 Twilio connected')
+          console.log('📱 Twilio Media Stream connected (event received)')
           break
-          
+
         case 'start':
+          console.log('🏁 Twilio "start" event received')
           // Call started - get metadata and connect to OpenAI
           streamSid = data.start.streamSid
           callSid = data.start.callSid
-          
+
           console.log(`📞 Call started: ${callSid}`)
           console.log(`   Stream SID: ${streamSid}`)
           console.log(`   Business ID: ${businessId}`)
-          
+
           // Fetch business details
           if (businessId) {
             const { data: bizData } = await supabase
@@ -182,24 +183,31 @@ async function handleMediaStream(connection, req) {
               .single()
             business = bizData
           }
-          
+
           // Create call record in database
-          const { data: callData } = await supabase
+          console.log('💾 Logging call to Supabase...')
+          const { data: callData, error: dbError } = await supabase
             .from('calls')
             .insert({
               business_id: businessId,
               twilio_call_sid: callSid,
+              provider: 'twilio', // Explicitly set provider
               from_number: data.start.customParameters?.from || 'unknown',
               to_number: data.start.customParameters?.to || 'unknown',
               started_at: new Date().toISOString()
             })
             .select()
             .single()
-          
+
+          if (dbError) {
+            console.error('❌ Supabase Error:', dbError)
+          }
+
           if (callData) {
             callId = callData.id
+            console.log(`✅ Call record created: ${callId}`)
           }
-          
+
           // Connect to OpenAI Realtime API
           openaiWs = new WebSocket(OPENAI_REALTIME_URL, {
             headers: {
@@ -207,11 +215,12 @@ async function handleMediaStream(connection, req) {
               'OpenAI-Beta': 'realtime=v1'
             }
           })
-          
+
           openaiWs.on('open', () => {
-            console.log('🤖 Connected to OpenAI Realtime API')
-            
+            console.log('🤖 OpenAI Realtime WebSocket OPEN')
+
             // Configure the session
+            console.log('⚙️ Sending session.update...')
             openaiWs.send(JSON.stringify({
               type: 'session.update',
               session: {
@@ -233,7 +242,7 @@ async function handleMediaStream(connection, req) {
                 tool_choice: 'auto'
               }
             }))
-            
+
             // Send initial greeting
             openaiWs.send(JSON.stringify({
               type: 'response.create',
@@ -243,11 +252,11 @@ async function handleMediaStream(connection, req) {
               }
             }))
           })
-          
+
           openaiWs.on('message', async (openaiMessage) => {
             try {
               const response = JSON.parse(openaiMessage.toString())
-              
+
               switch (response.type) {
                 case 'response.audio.delta':
                   // Send audio back to Twilio
@@ -261,33 +270,33 @@ async function handleMediaStream(connection, req) {
                     }))
                   }
                   break
-                  
+
                 case 'response.audio_transcript.done':
                   // AI finished speaking - log transcript
                   console.log(`🤖 AI: ${response.transcript}`)
                   transcript.push({ role: 'assistant', content: response.transcript })
                   break
-                  
+
                 case 'conversation.item.input_audio_transcription.completed':
                   // User finished speaking - log transcript
                   console.log(`👤 User: ${response.transcript}`)
                   transcript.push({ role: 'user', content: response.transcript })
                   break
-                  
+
                 case 'response.function_call_arguments.done':
                   // Handle tool calls
                   const toolName = response.name
                   const toolArgs = JSON.parse(response.arguments)
-                  
+
                   console.log(`🔧 Tool call: ${toolName}`, toolArgs)
-                  
+
                   const result = await handleToolCall(toolName, toolArgs, {
                     businessId,
                     callId,
                     streamSid,
                     socket
                   })
-                  
+
                   // Send tool result back to OpenAI
                   openaiWs.send(JSON.stringify({
                     type: 'conversation.item.create',
@@ -297,13 +306,13 @@ async function handleMediaStream(connection, req) {
                       output: JSON.stringify(result)
                     }
                   }))
-                  
+
                   // Trigger response after tool call
                   openaiWs.send(JSON.stringify({
                     type: 'response.create'
                   }))
                   break
-                  
+
                 case 'error':
                   console.error('OpenAI error:', response.error)
                   break
@@ -312,16 +321,16 @@ async function handleMediaStream(connection, req) {
               console.error('Error processing OpenAI message:', err)
             }
           })
-          
+
           openaiWs.on('close', () => {
             console.log('🤖 OpenAI connection closed')
           })
-          
+
           openaiWs.on('error', (err) => {
             console.error('OpenAI WebSocket error:', err)
           })
           break
-          
+
         case 'media':
           // Forward audio to OpenAI
           if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
@@ -331,10 +340,10 @@ async function handleMediaStream(connection, req) {
             }))
           }
           break
-          
+
         case 'stop':
           console.log('📴 Call ended')
-          
+
           // Update call record
           if (callId) {
             await supabase
@@ -345,7 +354,7 @@ async function handleMediaStream(connection, req) {
               })
               .eq('id', callId)
           }
-          
+
           // Close OpenAI connection
           if (openaiWs) {
             openaiWs.close()
@@ -356,15 +365,15 @@ async function handleMediaStream(connection, req) {
       console.error('Error handling Twilio message:', err)
     }
   })
-  
+
   socket.on('close', async () => {
     console.log('📱 Twilio connection closed')
-    
+
     // Cleanup
     if (openaiWs) {
       openaiWs.close()
     }
-    
+
     // Final update to call record
     if (callId) {
       await supabase
@@ -376,7 +385,7 @@ async function handleMediaStream(connection, req) {
         .eq('id', callId)
     }
   })
-  
+
   socket.on('error', (err) => {
     console.error('Twilio WebSocket error:', err)
   })
@@ -385,23 +394,23 @@ async function handleMediaStream(connection, req) {
 // Handle tool calls from the AI
 async function handleToolCall(toolName, args, context) {
   const { businessId, callId } = context
-  
+
   switch (toolName) {
     case 'check_availability':
       return await checkAvailability(businessId, args.date)
-      
+
     case 'book_appointment':
       return await bookAppointment(businessId, callId, args)
-      
+
     case 'cancel_appointment':
       return await cancelAppointment(businessId, args)
-      
+
     case 'transfer_to_human':
-      return { 
-        success: true, 
-        message: 'Transferring to human staff. Please hold.' 
+      return {
+        success: true,
+        message: 'Transferring to human staff. Please hold.'
       }
-      
+
     default:
       return { error: 'Unknown tool' }
   }
@@ -416,15 +425,15 @@ async function checkAvailability(businessId, date) {
       .select('working_hours, slot_duration_minutes, buffer_minutes')
       .eq('id', businessId)
       .single()
-    
+
     if (!business) {
       return { error: 'Business not found' }
     }
-    
+
     // Get existing appointments for that date
     const startOfDay = `${date}T00:00:00`
     const endOfDay = `${date}T23:59:59`
-    
+
     const { data: appointments } = await supabase
       .from('appointments')
       .select('scheduled_at, duration_minutes')
@@ -432,7 +441,7 @@ async function checkAvailability(businessId, date) {
       .gte('scheduled_at', startOfDay)
       .lte('scheduled_at', endOfDay)
       .in('status', ['confirmed', 'pending'])
-    
+
     // Check if date is blacked out
     const { data: blackout } = await supabase
       .from('blackout_dates')
@@ -440,65 +449,65 @@ async function checkAvailability(businessId, date) {
       .eq('business_id', businessId)
       .eq('date', date)
       .single()
-    
+
     if (blackout) {
-      return { 
-        available: false, 
+      return {
+        available: false,
         message: 'Sorry, we are closed on this date.',
         slots: []
       }
     }
-    
+
     // Determine day of week
     const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' })
     const dayHours = business.working_hours?.[dayOfWeek]
-    
+
     if (!dayHours || !dayHours.enabled) {
-      return { 
-        available: false, 
+      return {
+        available: false,
         message: 'Sorry, we are closed on this day.',
         slots: []
       }
     }
-    
+
     // Generate available slots
     const slotDuration = business.slot_duration_minutes || 30
     const buffer = business.buffer_minutes || 10
     const slots = []
-    
+
     let [startHour, startMin] = dayHours.start.split(':').map(Number)
     let [endHour, endMin] = dayHours.end.split(':').map(Number)
-    
+
     let currentTime = startHour * 60 + startMin
     const endTime = endHour * 60 + endMin
-    
+
     while (currentTime + slotDuration <= endTime) {
       const slotHour = Math.floor(currentTime / 60)
       const slotMinute = currentTime % 60
       const slotTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`
-      
+
       // Check if slot conflicts with existing appointments
       const slotStart = new Date(`${date}T${slotTimeStr}:00`)
       const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000)
-      
+
       const hasConflict = appointments?.some(apt => {
         const aptStart = new Date(apt.scheduled_at)
         const aptEnd = new Date(aptStart.getTime() + (apt.duration_minutes || 30) * 60 * 1000)
         return slotStart < aptEnd && slotEnd > aptStart
       })
-      
+
       if (!hasConflict) {
         slots.push(slotTimeStr)
       }
-      
+
       currentTime += slotDuration + buffer
     }
-    
+
     return {
       available: slots.length > 0,
       date: date,
       slots: slots,
-      message: slots.length > 0 
+      message: slots.length > 0
         ? `Available times on ${date}: ${slots.slice(0, 5).join(', ')}${slots.length > 5 ? ` and ${slots.length - 5} more` : ''}`
         : 'No available slots on this date.'
     }
@@ -512,7 +521,7 @@ async function checkAvailability(businessId, date) {
 async function bookAppointment(businessId, callId, args) {
   try {
     const { customer_name, customer_phone, date, time, service, notes } = args
-    
+
     // Create or find customer
     let { data: customer } = await supabase
       .from('customers')
@@ -520,7 +529,7 @@ async function bookAppointment(businessId, callId, args) {
       .eq('business_id', businessId)
       .eq('phone', customer_phone)
       .single()
-    
+
     if (!customer) {
       const { data: newCustomer } = await supabase
         .from('customers')
@@ -533,10 +542,10 @@ async function bookAppointment(businessId, callId, args) {
         .single()
       customer = newCustomer
     }
-    
+
     // Create appointment
     const scheduledAt = `${date}T${time}:00`
-    
+
     const { data: appointment, error } = await supabase
       .from('appointments')
       .insert({
@@ -551,12 +560,12 @@ async function bookAppointment(businessId, callId, args) {
       })
       .select()
       .single()
-    
+
     if (error) {
       console.error('Booking error:', error)
       return { success: false, error: 'Failed to book appointment' }
     }
-    
+
     // Update call outcome
     if (callId) {
       await supabase
@@ -564,7 +573,7 @@ async function bookAppointment(businessId, callId, args) {
         .update({ outcome: 'booked', intent_detected: 'book_appointment' })
         .eq('id', callId)
     }
-    
+
     return {
       success: true,
       message: `Appointment confirmed for ${customer_name} on ${date} at ${time}`,
@@ -580,26 +589,26 @@ async function bookAppointment(businessId, callId, args) {
 async function cancelAppointment(businessId, args) {
   try {
     const { customer_phone, date } = args
-    
+
     let query = supabase
       .from('appointments')
       .update({ status: 'cancelled' })
       .eq('business_id', businessId)
       .eq('customer_phone', customer_phone)
       .eq('status', 'confirmed')
-    
+
     if (date) {
       const startOfDay = `${date}T00:00:00`
       const endOfDay = `${date}T23:59:59`
       query = query.gte('scheduled_at', startOfDay).lte('scheduled_at', endOfDay)
     }
-    
+
     const { data, error } = await query.select()
-    
+
     if (error || !data || data.length === 0) {
       return { success: false, message: 'No appointment found to cancel' }
     }
-    
+
     return {
       success: true,
       message: `Appointment cancelled successfully`,
