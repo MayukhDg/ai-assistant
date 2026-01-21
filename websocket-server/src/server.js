@@ -4,8 +4,9 @@ const Fastify = require('fastify')
 const fastifyWebsocket = require('@fastify/websocket')
 const { handleMediaStream } = require('./handlers/mediaStreamHandler')
 const { handleRealtimeStream } = require('./handlers/realtimeHandler')
+const { handleExotelStream } = require('./handlers/exotelStreamHandler')
 
-const fastify = Fastify({ 
+const fastify = Fastify({
   logger: true,
   trustProxy: true
 })
@@ -35,15 +36,25 @@ fastify.register(async function (fastify) {
   })
 })
 
+// Exotel Voicebot WebSocket endpoint
+// This receives raw audio from Exotel and processes it (for Indian numbers)
+fastify.register(async function (fastify) {
+  fastify.get('/exotel-stream', { websocket: true }, (connection, req) => {
+    console.log('📞 New Exotel Stream connection')
+    handleExotelStream(connection, req)
+  })
+})
+
 // Start server
 const start = async () => {
   try {
     const port = process.env.PORT || 8080
     const host = process.env.HOST || '0.0.0.0'
-    
+
     await fastify.listen({ port, host })
     console.log(`🚀 Voice server running on ${host}:${port}`)
-    console.log(`   - Media Stream: ws://${host}:${port}/media-stream`)
+    console.log(`   - Twilio Media Stream: ws://${host}:${port}/media-stream`)
+    console.log(`   - Exotel Stream: ws://${host}:${port}/exotel-stream`)
     console.log(`   - Health Check: http://${host}:${port}/health`)
   } catch (err) {
     fastify.log.error(err)
