@@ -17,12 +17,12 @@ export const runtime = 'nodejs'
 
 export async function POST(request) {
   const supabase = createAdminClient()
-  
+
   try {
     // Parse form data from Twilio
     const formData = await request.formData()
     const body = Object.fromEntries(formData.entries())
-    
+
     const {
       CallSid,
       From,
@@ -30,39 +30,39 @@ export async function POST(request) {
       CallStatus,
       Direction
     } = body
-    
+
     console.log(`📞 Incoming call: ${CallSid}`)
     console.log(`   From: ${From}`)
     console.log(`   To: ${To}`)
     console.log(`   Direction: ${Direction}`)
-    
+
     // For inbound calls: look up by To (Twilio number)
     // For outbound calls: look up by From (Twilio number)
     const twilioNumber = Direction === 'outbound-api' ? From : To
-    
+
     // Look up business by phone number
     const { data: business, error } = await supabase
       .from('businesses')
       .select('*')
       .eq('phone_number', twilioNumber)
       .single()
-    
+
     if (error || !business) {
       console.error('Business not found for number:', To)
-      
+
       // Return a generic message
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">Sorry, this number is not configured. Please try again later.</Say>
   <Hangup/>
 </Response>`
-      
+
       return new NextResponse(twiml, {
         status: 200,
         headers: { 'Content-Type': 'text/xml' }
       })
     }
-    
+
     // Create call record
     await supabase
       .from('calls')
@@ -73,23 +73,34 @@ export async function POST(request) {
         to_number: To,
         started_at: new Date().toISOString()
       })
-    
+
     // Increment call counter
     await supabase
       .from('businesses')
       .update({ calls_this_month: business.calls_this_month + 1 })
       .eq('id', business.id)
-    
+
     // Determine which flow to use based on environment
     const useRealtimeStream = process.env.VOICE_SERVER_URL && process.env.USE_REALTIME_STREAM === 'true'
-    
+
     if (useRealtimeStream) {
       // Use WebSocket-based real-time streaming (low latency)
       const websocketUrl = process.env.VOICE_SERVER_URL.replace('https://', 'wss://').replace('http://', 'ws://')
       const streamUrl = `${websocketUrl}/media-stream`
-      
-      const twiml = generateMediaStreamTwiML(streamUrl, business.id, From, To)
-      
+
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">DEBUG: Attempting real time connection.</Say>
+  <Pause length="1"/>
+  <Connect>
+    <Stream url="${streamUrl}">
+      <Parameter name="businessId" value="${business.id}" />
+      <Parameter name="from" value="${From}" />
+      <Parameter name="to" value="${To}" />
+    </Stream>
+  </Connect>
+</Response>`
+
       return new NextResponse(twiml, {
         status: 200,
         headers: { 'Content-Type': 'text/xml' }
@@ -98,12 +109,19 @@ export async function POST(request) {
       // Use webhook-based flow (simpler, works with Vercel)
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `https://${request.headers.get('host')}`
       const gatherUrl = `${baseUrl}/api/voice/gather?businessId=${business.id}&callSid=${CallSid}`
-      
-      const greeting = business.greeting_message || 
+
+      const greeting = business.greeting_message ||
         `Hello! Thank you for calling ${business.name}. How can I help you today?`
-      
-      const twiml = generateGreetingTwiML(greeting, gatherUrl)
-      
+
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">DEBUG: Attempting webhook gather mode.</Say>
+  <Gather input="speech" action="${gatherUrl}" method="POST" speechTimeout="auto" language="en-US">
+    <Say voice="Polly.Joanna">${greeting}</Say>
+  </Gather>
+  <Redirect method="POST">${gatherUrl}</Redirect>
+</Response>`
+
       return new NextResponse(twiml, {
         status: 200,
         headers: { 'Content-Type': 'text/xml' }
@@ -111,13 +129,13 @@ export async function POST(request) {
     }
   } catch (err) {
     console.error('Incoming call error:', err)
-    
+
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">Sorry, we're experiencing technical difficulties. Please try again later.</Say>
   <Hangup/>
 </Response>`
-    
+
     return new NextResponse(twiml, {
       status: 200,
       headers: { 'Content-Type': 'text/xml' }
