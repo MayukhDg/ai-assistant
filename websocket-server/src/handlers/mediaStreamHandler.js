@@ -157,7 +157,14 @@ async function handleMediaStream(connection, req) {
 
   socket.on('message', async (message) => {
     try {
-      const data = JSON.parse(message.toString())
+      const msgString = message.toString()
+      let data
+      try {
+        data = JSON.parse(msgString)
+      } catch (e) {
+        console.error('❌ Error parsing Twilio message:', msgString.substring(0, 100))
+        return
+      }
 
       switch (data.event) {
         case 'connected':
@@ -216,12 +223,25 @@ async function handleMediaStream(connection, req) {
           }
 
           // Connect to OpenAI Realtime API
-          openaiWs = new WebSocket(OPENAI_REALTIME_URL, {
-            headers: {
-              'Authorization': `Bearer ${OPENAI_API_KEY}`,
-              'OpenAI-Beta': 'realtime=v1'
-            }
-          })
+          console.log('🔗 Protocol: wss, Host: api.openai.com')
+          if (!OPENAI_API_KEY) {
+            console.error('❌ CRITICAL: OPENAI_API_KEY is missing on server!')
+            socket.close()
+            return
+          }
+
+          try {
+            openaiWs = new WebSocket(OPENAI_REALTIME_URL, {
+              headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'OpenAI-Beta': 'realtime=v1'
+              }
+            })
+          } catch (wsErr) {
+            console.error('❌ Failed to create OpenAI WebSocket:', wsErr.message)
+            socket.close()
+            return
+          }
 
           openaiWs.on('open', () => {
             console.log('🤖 OpenAI Realtime WebSocket OPEN')

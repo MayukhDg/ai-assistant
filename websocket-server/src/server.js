@@ -19,6 +19,24 @@ fastify.get('/health', async (request, reply) => {
   return { status: 'ok', timestamp: new Date().toISOString() }
 })
 
+// Root endpoint to verify server is alive
+fastify.get('/', async (request, reply) => {
+  return {
+    message: 'AI Assistant Voice Server is running!',
+    endpoints: {
+      twilio: '/media-stream',
+      exotel: '/exotel-stream',
+      health: '/health'
+    }
+  }
+})
+
+// Global error handler
+fastify.setErrorHandler((error, request, reply) => {
+  fastify.log.error(error)
+  reply.status(500).send({ error: 'Internal Server Error', message: error.message })
+})
+
 // Twilio Media Streams WebSocket endpoint
 // This receives raw audio from Twilio and processes it
 fastify.register(async function (fastify) {

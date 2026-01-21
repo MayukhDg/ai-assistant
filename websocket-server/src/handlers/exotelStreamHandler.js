@@ -164,11 +164,18 @@ async function handleExotelStream(connection, req) {
 
     socket.on('message', async (message) => {
         try {
-            const data = JSON.parse(message.toString())
+            const msgString = message.toString()
+            let data
+            try {
+                data = JSON.parse(msgString)
+            } catch (e) {
+                console.error('❌ Error parsing Exotel message:', msgString.substring(0, 100))
+                return
+            }
 
             switch (data.event) {
                 case 'connected':
-                    console.log('📱 Exotel WebSocket connected')
+                    console.log('📱 Exotel WebSocket connected (event received)')
                     break
 
                 case 'start':
@@ -216,13 +223,25 @@ async function handleExotelStream(connection, req) {
                     }
 
                     // Connect to OpenAI Realtime API
-                    // Exotel sends PCM 16-bit audio, OpenAI supports pcm16 format
-                    openaiWs = new WebSocket(OPENAI_REALTIME_URL, {
-                        headers: {
-                            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                            'OpenAI-Beta': 'realtime=v1'
-                        }
-                    })
+                    console.log('🔗 Protocol: wss, Host: api.openai.com (Exotel)')
+                    if (!OPENAI_API_KEY) {
+                        console.error('❌ CRITICAL: OPENAI_API_KEY is missing on server!')
+                        socket.close()
+                        return
+                    }
+
+                    try {
+                        openaiWs = new WebSocket(OPENAI_REALTIME_URL, {
+                            headers: {
+                                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                                'OpenAI-Beta': 'realtime=v1'
+                            }
+                        })
+                    } catch (wsErr) {
+                        console.error('❌ Failed to create OpenAI WebSocket (Exotel):', wsErr.message)
+                        socket.close()
+                        return
+                    }
 
                     openaiWs.on('open', () => {
                         console.log('🤖 Connected to OpenAI Realtime API (Exotel)')
