@@ -85,13 +85,12 @@ export async function POST(request) {
 
     if (useRealtimeStream) {
       // Use WebSocket-based real-time streaming (low latency)
-      const websocketUrl = process.env.VOICE_SERVER_URL.replace('https://', 'wss://').replace('http://', 'ws://')
-      const streamUrl = `${websocketUrl}/media-stream`
+      const websocketUrl = process.env.VOICE_SERVER_URL.trim().replace('https://', 'wss://').replace('http://', 'ws://')
+      const streamUrl = `${websocketUrl}/media-stream?businessId=${business.id}`
 
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">DEBUG: Attempting real time connection.</Say>
-  <Pause length="1"/>
+  <Say voice="Polly.Joanna">Connecting to AI assistant.</Say>
   <Connect>
     <Stream url="${streamUrl}">
       <Parameter name="businessId" value="${business.id}" />

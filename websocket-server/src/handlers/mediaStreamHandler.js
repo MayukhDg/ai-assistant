@@ -172,7 +172,14 @@ async function handleMediaStream(connection, req) {
 
           console.log(`📞 Call started: ${callSid}`)
           console.log(`   Stream SID: ${streamSid}`)
-          console.log(`   Business ID: ${businessId}`)
+
+          // Get business ID from custom parameters if not in URL
+          if (!businessId && data.start.customParameters?.businessId) {
+            businessId = data.start.customParameters.businessId
+            console.log(`   Business ID from parameters: ${businessId}`)
+          } else {
+            console.log(`   Business ID from URL: ${businessId}`)
+          }
 
           // Fetch business details
           if (businessId) {
