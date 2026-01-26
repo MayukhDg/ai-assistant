@@ -17,6 +17,7 @@
 
 const WebSocket = require('ws')
 const { createClient } = require('@supabase/supabase-js')
+const { DateTime } = require('luxon')
 
 // Supabase admin client
 const supabase = createClient(
@@ -522,6 +523,7 @@ async function checkAvailability(businessId, date) {
         const slotDuration = business.slot_duration_minutes || 30
         const buffer = business.buffer_minutes || 10
         const slots = []
+        const timezone = business.timezone || 'UTC'
 
         let [startHour, startMin] = dayHours.start.split(':').map(Number)
         let [endHour, endMin] = dayHours.end.split(':').map(Number)
@@ -534,7 +536,7 @@ async function checkAvailability(businessId, date) {
             const slotMinute = currentTime % 60
             const slotTimeStr = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`
 
-            const slotStart = new Date(`${date}T${slotTimeStr}:00`)
+            const slotStart = DateTime.fromFormat(`${date} ${slotTimeStr}`, 'yyyy-MM-dd HH:mm', { zone: timezone }).toJSDate()
             const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000)
 
             const hasConflict = appointments?.some(apt => {
@@ -589,7 +591,15 @@ async function bookAppointment(businessId, callId, args) {
             customer = newCustomer
         }
 
-        const scheduledAt = `${date}T${time}:00`
+        // Create appointment
+        const { data: business } = await supabase
+            .from('businesses')
+            .select('timezone')
+            .eq('id', businessId)
+            .single()
+
+        const timezone = business?.timezone || 'UTC'
+        const scheduledAt = DateTime.fromFormat(`${date} ${time}`, 'yyyy-MM-dd HH:mm', { zone: timezone }).toUTC().toISO()
 
         const { data: appointment, error } = await supabase
             .from('appointments')

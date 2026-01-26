@@ -16,25 +16,72 @@ const businessTypes = [
 ]
 
 const timezones = [
-  { value: 'America/New_York', label: 'Eastern Time (ET)' },
-  { value: 'America/Chicago', label: 'Central Time (CT)' },
-  { value: 'America/Denver', label: 'Mountain Time (MT)' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  // Americas
+  { value: 'America/New_York', label: 'Eastern Time (ET) - US' },
+  { value: 'America/Chicago', label: 'Central Time (CT) - US' },
+  { value: 'America/Denver', label: 'Mountain Time (MT) - US' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT) - US' },
   { value: 'America/Phoenix', label: 'Arizona (No DST)' },
   { value: 'America/Anchorage', label: 'Alaska Time' },
   { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+  { value: 'America/Toronto', label: 'Toronto - Canada' },
+  { value: 'America/Vancouver', label: 'Vancouver - Canada' },
+  { value: 'America/Mexico_City', label: 'Mexico City' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo - Brazil' },
+  { value: 'America/Buenos_Aires', label: 'Buenos Aires - Argentina' },
+  { value: 'America/Bogota', label: 'Bogota - Colombia' },
+
+  // Europe
+  { value: 'Europe/London', label: 'London - UK (GMT/BST)' },
+  { value: 'Europe/Paris', label: 'Paris - France (CET)' },
+  { value: 'Europe/Berlin', label: 'Berlin - Germany (CET)' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam - Netherlands' },
+  { value: 'Europe/Madrid', label: 'Madrid - Spain' },
+  { value: 'Europe/Rome', label: 'Rome - Italy' },
+  { value: 'Europe/Zurich', label: 'Zurich - Switzerland' },
+  { value: 'Europe/Stockholm', label: 'Stockholm - Sweden' },
+  { value: 'Europe/Moscow', label: 'Moscow - Russia' },
+  { value: 'Europe/Istanbul', label: 'Istanbul - Turkey' },
+
+  // Asia
+  { value: 'Asia/Kolkata', label: 'India (IST)' },
+  { value: 'Asia/Dubai', label: 'Dubai - UAE (GST)' },
+  { value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong (HKT)' },
+  { value: 'Asia/Shanghai', label: 'China (CST)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo - Japan (JST)' },
+  { value: 'Asia/Seoul', label: 'Seoul - South Korea' },
+  { value: 'Asia/Bangkok', label: 'Bangkok - Thailand' },
+  { value: 'Asia/Jakarta', label: 'Jakarta - Indonesia' },
+  { value: 'Asia/Karachi', label: 'Karachi - Pakistan' },
+  { value: 'Asia/Dhaka', label: 'Dhaka - Bangladesh' },
+  { value: 'Asia/Riyadh', label: 'Riyadh - Saudi Arabia' },
+  { value: 'Asia/Jerusalem', label: 'Jerusalem - Israel' },
+
+  // Oceania
+  { value: 'Australia/Sydney', label: 'Sydney - Australia (AEST)' },
+  { value: 'Australia/Melbourne', label: 'Melbourne - Australia' },
+  { value: 'Australia/Perth', label: 'Perth - Australia (AWST)' },
+  { value: 'Pacific/Auckland', label: 'Auckland - New Zealand' },
+
+  // Africa
+  { value: 'Africa/Johannesburg', label: 'Johannesburg - South Africa' },
+  { value: 'Africa/Lagos', label: 'Lagos - Nigeria' },
+  { value: 'Africa/Cairo', label: 'Cairo - Egypt' },
+  { value: 'Africa/Nairobi', label: 'Nairobi - Kenya' },
 ]
+
 
 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
 export default function SettingsPage() {
   const router = useRouter()
   const supabase = createClient()
-  
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
-  
+
   const [business, setBusiness] = useState({
     name: '',
     phone_number: '',
@@ -57,20 +104,20 @@ export default function SettingsPage() {
       sunday: { start: '10:00', end: '14:00', enabled: false },
     }
   })
-  
+
   useEffect(() => {
     loadBusiness()
   }, [])
-  
+
   async function loadBusiness() {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     const { data } = await supabase
       .from('businesses')
       .select('*')
       .eq('user_id', user.id)
       .single()
-    
+
     if (data) {
       setBusiness(prev => ({
         ...prev,
@@ -78,24 +125,24 @@ export default function SettingsPage() {
         working_hours: data.working_hours || prev.working_hours
       }))
     }
-    
+
     setLoading(false)
   }
-  
+
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
     setMessage(null)
-    
+
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     // Check if business exists
     const { data: existing } = await supabase
       .from('businesses')
       .select('id')
       .eq('user_id', user.id)
       .single()
-    
+
     const businessData = {
       name: business.name,
       phone_number: business.phone_number || null,
@@ -110,9 +157,9 @@ export default function SettingsPage() {
       fallback_enabled: business.fallback_enabled,
       working_hours: business.working_hours
     }
-    
+
     let error
-    
+
     if (existing) {
       const result = await supabase
         .from('businesses')
@@ -125,17 +172,17 @@ export default function SettingsPage() {
         .insert({ ...businessData, user_id: user.id })
       error = result.error
     }
-    
+
     if (error) {
       setMessage({ type: 'error', text: error.message })
     } else {
       setMessage({ type: 'success', text: 'Settings saved successfully!' })
       router.refresh()
     }
-    
+
     setSaving(false)
   }
-  
+
   function updateWorkingHours(day, field, value) {
     setBusiness(prev => ({
       ...prev,
@@ -148,7 +195,7 @@ export default function SettingsPage() {
       }
     }))
   }
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -156,24 +203,23 @@ export default function SettingsPage() {
       </div>
     )
   }
-  
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-      
+
       {message && (
-        <div className={`rounded-md p-4 ${
-          message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-        }`}>
+        <div className={`rounded-md p-4 ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}>
           {message.text}
         </div>
       )}
-      
+
       <form onSubmit={handleSave} className="space-y-8">
         {/* Basic Info */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Business Information</h2>
-          
+
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -187,7 +233,7 @@ export default function SettingsPage() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Business Type
@@ -202,7 +248,7 @@ export default function SettingsPage() {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Phone Number (Twilio)
@@ -218,7 +264,7 @@ export default function SettingsPage() {
                 Your Twilio phone number for the AI receptionist
               </p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Timezone
@@ -235,11 +281,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-        
+
         {/* AI Settings */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">AI Assistant</h2>
-          
+
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -255,7 +301,7 @@ export default function SettingsPage() {
                 The first thing callers hear
               </p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Custom Instructions (Optional)
@@ -273,11 +319,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Working Hours */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Working Hours</h2>
-          
+
           <div className="space-y-3">
             {days.map(day => (
               <div key={day} className="flex items-center space-x-4">
@@ -292,7 +338,7 @@ export default function SettingsPage() {
                     <span className="ml-2 text-sm text-gray-700 capitalize">{day}</span>
                   </label>
                 </div>
-                
+
                 {business.working_hours[day]?.enabled && (
                   <>
                     <input
@@ -314,11 +360,11 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
-        
+
         {/* Booking Settings */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Booking Settings</h2>
-          
+
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -334,7 +380,7 @@ export default function SettingsPage() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Buffer Between Slots (minutes)
@@ -349,7 +395,7 @@ export default function SettingsPage() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Max Advance Booking (days)
@@ -365,11 +411,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Fallback */}
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Human Fallback</h2>
-          
+
           <div className="space-y-4">
             <label className="flex items-center">
               <input
@@ -382,7 +428,7 @@ export default function SettingsPage() {
                 Enable transfer to human when AI cannot help
               </span>
             </label>
-            
+
             {business.fallback_enabled && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -402,7 +448,7 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-        
+
         {/* Save Button */}
         <div className="flex justify-end">
           <button
