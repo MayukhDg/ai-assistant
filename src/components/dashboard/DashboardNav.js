@@ -59,13 +59,13 @@ export default function DashboardNav({ user, business }) {
   const router = useRouter()
   const supabase = createClient()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }
-  
+
   return (
     <nav className="bg-white shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,25 +74,24 @@ export default function DashboardNav({ user, business }) {
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
               <Link href="/dashboard" className="text-xl font-bold text-gray-900">
-                🎙️ AI Receptionist
+                🎙️ DynoDesk
               </Link>
             </div>
-            
+
             {/* Desktop Navigation */}
             <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
               {navigation.map((item) => {
-                const isActive = pathname === item.href || 
+                const isActive = pathname === item.href ||
                   (item.href !== '/dashboard' && pathname.startsWith(item.href))
-                
+
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                      isActive 
-                        ? 'text-blue-600 bg-blue-50' 
+                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${isActive
+                        ? 'text-blue-600 bg-blue-50'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <item.icon className="w-5 h-5 mr-1.5" />
                     {item.name}
@@ -101,7 +100,7 @@ export default function DashboardNav({ user, business }) {
               })}
             </div>
           </div>
-          
+
           {/* Right side */}
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             <div className="flex items-center space-x-4">
@@ -116,7 +115,7 @@ export default function DashboardNav({ user, business }) {
               </button>
             </div>
           </div>
-          
+
           {/* Mobile menu button */}
           <div className="flex items-center sm:hidden">
             <button
@@ -137,7 +136,7 @@ export default function DashboardNav({ user, business }) {
           </div>
         </div>
       </div>
-      
+
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="sm:hidden">
@@ -145,17 +144,16 @@ export default function DashboardNav({ user, business }) {
             {navigation.map((item) => {
               const isActive = pathname === item.href ||
                 (item.href !== '/dashboard' && pathname.startsWith(item.href))
-              
+
               return (
                 <Link
                   key={item.name}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`block pl-3 pr-4 py-2 text-base font-medium ${
-                    isActive
+                  className={`block pl-3 pr-4 py-2 text-base font-medium ${isActive
                       ? 'text-blue-600 bg-blue-50 border-l-4 border-blue-600'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {item.name}
                 </Link>

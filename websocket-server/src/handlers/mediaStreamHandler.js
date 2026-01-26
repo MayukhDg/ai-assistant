@@ -457,7 +457,7 @@ async function checkAvailability(businessId, date) {
     // Get business working hours
     const { data: business } = await supabase
       .from('businesses')
-      .select('working_hours, slot_duration_minutes, buffer_minutes')
+      .select('working_hours, slot_duration_minutes, buffer_minutes, timezone')
       .eq('id', businessId)
       .single()
 
