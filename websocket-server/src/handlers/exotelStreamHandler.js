@@ -508,7 +508,7 @@ async function checkAvailability(businessId, date) {
             }
         }
 
-        const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' })
+        const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
         const dayHours = business.working_hours?.[dayOfWeek]
 
         if (!dayHours || !dayHours.enabled) {

@@ -90,7 +90,6 @@ export async function POST(request) {
 
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Connecting to AI assistant.</Say>
   <Connect>
     <Stream url="${streamUrl}">
       <Parameter name="businessId" value="${business.id}" />
@@ -114,7 +113,6 @@ export async function POST(request) {
 
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">DEBUG: Attempting webhook gather mode.</Say>
   <Gather input="speech" action="${gatherUrl}" method="POST" speechTimeout="auto" language="en-US">
     <Say voice="Polly.Joanna">${greeting}</Say>
   </Gather>
